@@ -5,6 +5,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <link type="text/css" rel="stylesheet" href="main.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     </head>
     <body>
 
@@ -21,12 +22,16 @@
 
             import * as THREE from 'three';
             import { ARButton } from 'three/addons/webxr/ARButton.js';
+            import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+            import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
             let container;
             let camera, scene, renderer;
             let controller1, controller2;
 
             let reticle;
+            let current_object;
+            let pmremGenerator;
 
             let hitTestSource = null;
             let hitTestSourceRequested = false;
@@ -54,6 +59,8 @@
                 renderer.setAnimationLoop( animate );
                 renderer.xr.enabled = true;
                 container.appendChild( renderer.domElement );
+                pmremGenerator = new THREE.PMREMGenerator(renderer);
+                pmremGenerator.compileEquirectangularShader();
 
                 //
 
@@ -61,22 +68,15 @@
 
                 //
 
-                const geometry = new THREE.CylinderGeometry( 0.1, 0.1, 0.2, 32 ).translate( 0, 0.1, 0 );
+               function onSelect() {
 
+    if ( reticle.visible && current_object ) {
 
-                function onSelect() {
+        current_object.position.setFromMatrixPosition( reticle.matrix );
 
-                    if ( reticle.visible ) {
+    }
 
-                        const material = new THREE.MeshPhongMaterial( { color: 0xffffff * Math.random() } );
-                        const mesh = new THREE.Mesh( geometry, material );
-                        reticle.matrix.decompose( mesh.position, mesh.quaternion, mesh.scale );
-                        mesh.scale.y = Math.random() * 2 + 1;
-                        scene.add( mesh );
-
-                    }
-
-                }
+}
 
                 controller1 = renderer.xr.getController( 0 );
                 controller1.addEventListener( 'select', onSelect );
@@ -98,7 +98,9 @@
 
                 window.addEventListener( 'resize', onWindowResize );
 
-            }
+loadModel("1");
+
+}
 
             function onWindowResize() {
 
@@ -108,6 +110,41 @@
                 renderer.setSize( window.innerWidth, window.innerHeight );
 
             }
+
+            function loadModel(model){
+
+    new RGBELoader()
+        .setDataType(THREE.HalfFloatType)
+        .setPath('textures/')
+        .load('golden_bay_2k.hdr', function(texture){
+
+            const envmap = pmremGenerator.fromEquirectangular(texture).texture;
+            texture.flipY = false;
+            texture.premultiplyAlpha = false;
+            scene.environment = envmap;
+            texture.dispose();
+            pmremGenerator.dispose();
+
+          var loader = new GLTFLoader().setPath('3d/');
+loader.load(model + ".glb", function(glb) {
+
+    if (current_object) {
+        scene.remove(current_object);
+    }
+
+    current_object = glb.scene;
+    scene.add(current_object);
+
+});
+
+});
+
+}
+
+$(".ar-object").click(function () {
+    const id = $(this).attr("id");
+    loadModel(id);
+});
 
             //
 
@@ -169,10 +206,10 @@
         </script>
         <div id="mySidenav" class="sidenav">
   <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-  <a href="#">Objet 1</a>
-  <a href="#">Objet 2</a>
-  <a href="#">Objet 3</a>
-  <a href="#">Objet 4</a>
+  <a class="ar-object" id="1" href="#">Objet 1</a>
+<a class="ar-object" id="2" href="#">Objet 2</a>
+<a class="ar-object" id="3" href="#">Objet 3</a>
+<a class="ar-object" id="4" href="#">Objet 4</a>
 </div>
 
 <span style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776; open</span>
